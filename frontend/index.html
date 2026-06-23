@@ -1,0 +1,750 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>StrokeAI v4 — VinceNet</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"/>
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@700;800&family=DM+Sans:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet"/>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#060d18;--surf:#0d1525;--bdr:rgba(255,255,255,.07);--bdr2:rgba(255,255,255,.14);
+  --acc:#22d3ee;--acc2:#7c3aed;--red:#ef4444;--green:#10b981;
+  --txt:#e2e8f0;--muted:#64748b;--r:11px;--r2:17px;
+}
+html{scroll-behavior:smooth}
+body{background:var(--bg);color:var(--txt);font-family:'DM Sans',system-ui,sans-serif;
+     font-size:14px;-webkit-font-smoothing:antialiased;min-height:100vh}
+button{font-family:inherit;cursor:pointer}
+::-webkit-scrollbar{width:4px}::-webkit-scrollbar-thumb{background:#1e293b;border-radius:2px}
+@keyframes spin{to{transform:rotate(360deg)}}
+@keyframes fadeUp{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:translateY(0)}}
+@keyframes roiPulse{0%,100%{opacity:1}50%{opacity:.35}}
+
+/* ── Nav ── */
+nav{position:sticky;top:0;z-index:50;border-bottom:1px solid var(--bdr);
+    background:rgba(6,13,24,.93);backdrop-filter:blur(14px);
+    padding:11px 22px;display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap}
+.brand{display:flex;align-items:center;gap:9px}
+.brand-icon{width:32px;height:32px;border-radius:9px;
+            background:linear-gradient(135deg,#22d3ee,#7c3aed);
+            display:flex;align-items:center;justify-content:center;font-size:15px;flex-shrink:0}
+.brand-name{font-family:'Syne',serif;font-weight:800;font-size:1.05rem;color:#fff}
+.brand-tag{font-size:.58rem;font-family:monospace;color:var(--muted);
+           background:rgba(255,255,255,.06);padding:2px 7px;border-radius:4px}
+.nav-pills{display:flex;gap:7px;align-items:center;flex-wrap:wrap}
+.pill{font-size:.6rem;font-weight:600;padding:3px 9px;border-radius:99px}
+.p-ok  {background:rgba(16,185,129,.1);color:#34d399;border:1px solid rgba(16,185,129,.22)}
+.p-err {background:rgba(239,68,68,.1);color:#f87171;border:1px solid rgba(239,68,68,.22)}
+.p-warn{background:rgba(245,158,11,.1);color:#fbbf24;border:1px solid rgba(245,158,11,.22)}
+.p-info{background:rgba(34,211,238,.1);color:#22d3ee;border:1px solid rgba(34,211,238,.22)}
+
+/* ── Layout ── */
+main{max-width:960px;margin:0 auto;padding:40px 18px 80px;
+     display:flex;flex-direction:column;gap:26px}
+
+/* ── Hero ── */
+.hero{text-align:center}
+.hero h1{font-family:'Syne',serif;font-weight:800;
+          font-size:clamp(2rem,5vw,3.1rem);letter-spacing:-.03em;line-height:1.05;
+          background:linear-gradient(135deg,#67e8f9,#818cf8,#c084fc);
+          -webkit-background-clip:text;-webkit-text-fill-color:transparent;
+          background-clip:text;margin-bottom:12px}
+.hero p{color:var(--muted);font-size:.88rem;max-width:520px;margin:0 auto 12px;line-height:1.7}
+.hero-badges{display:flex;gap:7px;justify-content:center;flex-wrap:wrap}
+.hbadge{font-size:.63rem;font-family:monospace;padding:3px 10px;border-radius:99px;
+        border:1px solid var(--bdr2);color:var(--muted);background:rgba(255,255,255,.04)}
+.hbadge.good{color:#34d399;border-color:rgba(16,185,129,.3);background:rgba(16,185,129,.06)}
+
+/* ── Card ── */
+.card{background:var(--surf);border:1px solid var(--bdr);border-radius:var(--r2);padding:22px}
+
+/* ── Drop zone ── */
+#dz{border:2px dashed var(--bdr2);border-radius:var(--r2);padding:44px 20px;
+    text-align:center;cursor:pointer;transition:all .2s;position:relative;
+    background:rgba(255,255,255,.01)}
+#dz:hover,#dz.over{border-color:var(--acc);background:rgba(34,211,238,.04)}
+.dz-icon{width:52px;height:52px;margin:0 auto 13px;border-radius:14px;
+         background:linear-gradient(135deg,rgba(34,211,238,.15),rgba(124,58,237,.15));
+         display:flex;align-items:center;justify-content:center;font-size:22px}
+.dz-title{font-size:.92rem;font-weight:600;color:#fff;margin-bottom:5px}
+.dz-sub{font-size:.76rem;color:var(--muted)}
+.dz-sub b{color:var(--acc);font-weight:500}
+#cpill{display:none;position:absolute;top:10px;right:12px;font-size:.6rem;
+       font-weight:700;padding:2px 9px;border-radius:99px;background:var(--acc2);color:#fff}
+
+/* ── Thumbs ── */
+#thumbs{display:none;flex-wrap:wrap;gap:7px;margin-top:13px}
+.thumb{position:relative;width:72px;height:72px;border-radius:9px;overflow:hidden;
+       border:1px solid var(--bdr2);background:#000;flex-shrink:0}
+.thumb img{width:100%;height:100%;object-fit:cover}
+.tdel{position:absolute;top:2px;right:2px;width:16px;height:16px;border-radius:50%;
+      background:rgba(0,0,0,.76);border:none;color:#fff;font-size:.5rem;
+      cursor:pointer;display:flex;align-items:center;justify-content:center}
+.tdel:hover{background:var(--red)}
+.tname{position:absolute;bottom:0;left:0;right:0;font-size:.48rem;color:#ccc;
+       background:rgba(0,0,0,.72);padding:2px 3px;white-space:nowrap;
+       overflow:hidden;text-overflow:ellipsis}
+
+/* ── Actions ── */
+#action-row{display:none;gap:9px;margin-top:13px}
+#err-box{display:none;background:rgba(127,29,29,.3);border:1px solid rgba(239,68,68,.3);
+         border-radius:var(--r);padding:11px 14px;color:#fca5a5;font-size:.82rem;margin-top:12px}
+
+/* ── Buttons ── */
+.btn-p{padding:12px 26px;border:none;border-radius:var(--r);
+       background:linear-gradient(135deg,#22d3ee,#7c3aed);color:#fff;
+       font-weight:600;font-size:.9rem;transition:all .2s;
+       box-shadow:0 0 20px rgba(34,211,238,.2)}
+.btn-p:hover:not(:disabled){transform:scale(1.02);box-shadow:0 0 32px rgba(34,211,238,.38)}
+.btn-p:disabled{opacity:.5;cursor:not-allowed}
+.btn-g{padding:10px 16px;border:1px solid var(--bdr2);border-radius:var(--r);
+       background:transparent;color:var(--muted);font-size:.83rem;transition:.15s}
+.btn-g:hover{color:var(--txt);border-color:rgba(255,255,255,.3)}
+
+/* ── Loading ── */
+#loading{display:none;flex-direction:column;align-items:center;gap:12px;padding:26px}
+.spinner{width:40px;height:40px;border-radius:50%;
+         border:3px solid rgba(255,255,255,.07);border-top-color:var(--acc);
+         animation:spin .75s linear infinite}
+.steps-list{display:flex;flex-direction:column;gap:4px;width:100%;max-width:380px}
+.step{display:flex;align-items:center;gap:7px;font-size:.73rem;
+      color:var(--muted);opacity:.3;transition:all .3s}
+.step::before{content:'';width:5px;height:5px;border-radius:50%;
+              background:currentColor;flex-shrink:0}
+.step.active{opacity:1;color:var(--acc)}
+.step.done  {opacity:.6;color:var(--green)}
+
+/* ── Results ── */
+#results{display:none;flex-direction:column;gap:20px}
+.fade-up{animation:fadeUp .4s ease}
+
+/* ── Verdict ── */
+.verdict{border-radius:var(--r2);padding:20px 24px}
+.vs{background:linear-gradient(135deg,rgba(127,29,29,.5),rgba(69,10,10,.4));
+    border:1px solid rgba(239,68,68,.35)}
+.vn{background:linear-gradient(135deg,rgba(6,46,38,.6),rgba(4,30,25,.5));
+    border:1px solid rgba(16,185,129,.25)}
+.v-lbl{font-size:.58rem;font-weight:700;text-transform:uppercase;letter-spacing:.1em;
+       color:var(--muted);margin-bottom:7px}
+.v-title{font-family:'Syne',serif;font-weight:800;font-size:1.85rem;margin-bottom:4px}
+.v-sub{font-size:.8rem;color:var(--muted)}
+.v-stats{display:flex;gap:18px;flex-wrap:wrap;margin-top:12px;padding-top:12px;
+         border-top:1px solid rgba(255,255,255,.06)}
+.vstat .val{font-family:monospace;font-size:.88rem;font-weight:600;color:var(--txt);display:block}
+.vstat .lbl{font-size:.57rem;text-transform:uppercase;letter-spacing:.07em;color:var(--muted)}
+
+/* ── Confidence bar ── */
+.cbar-wrap{margin-top:15px}
+.cbar-hdr{display:flex;justify-content:space-between;align-items:center;margin-bottom:5px}
+.cbar-lbl{font-size:.58rem;font-weight:700;text-transform:uppercase;
+          letter-spacing:.08em;color:var(--muted)}
+.cbar-val{font-family:monospace;font-size:.86rem;font-weight:600}
+.cbar-track{height:6px;background:rgba(255,255,255,.06);border-radius:99px;overflow:hidden}
+.cbar-fill{height:100%;border-radius:99px;
+           transition:width 1.2s cubic-bezier(.4,0,.2,1);width:0}
+.fs{background:linear-gradient(90deg,#f97316,#ef4444)}
+.fn{background:linear-gradient(90deg,#10b981,#34d399)}
+
+/* ── Claude box ── */
+.claude-box{background:var(--surf);border:1px solid var(--bdr);
+            border-radius:var(--r2);padding:18px 22px}
+.claude-hdr{display:flex;align-items:center;gap:8px;margin-bottom:11px}
+.claude-icon{width:27px;height:27px;border-radius:7px;flex-shrink:0;
+             background:linear-gradient(135deg,rgba(34,211,238,.2),rgba(124,58,237,.2));
+             display:flex;align-items:center;justify-content:center;font-size:12px}
+.claude-lbl{font-size:.6rem;font-weight:700;text-transform:uppercase;
+            letter-spacing:.09em;color:var(--acc)}
+.claude-txt{font-size:.84rem;color:var(--txt);line-height:1.78;white-space:pre-line}
+
+/* ── Scan grid ── */
+.sec-title{font-size:.58rem;font-weight:700;text-transform:uppercase;
+           letter-spacing:.1em;color:var(--muted);margin-bottom:12px}
+#scan-grid{display:grid;gap:13px;
+           grid-template-columns:repeat(auto-fill,minmax(min(100%,390px),1fr))}
+.scan-card{border-radius:var(--r2);padding:15px;display:flex;flex-direction:column;gap:11px}
+.sc-s{background:rgba(127,29,29,.2);border:1px solid rgba(239,68,68,.28)}
+.sc-n{background:rgba(6,46,38,.2);border:1px solid rgba(16,185,129,.2)}
+.sc-hdr{display:flex;align-items:center;gap:7px;flex-wrap:wrap}
+.sc-num{font-size:.6rem;font-weight:700;padding:2px 7px;border-radius:99px;
+        background:rgba(255,255,255,.07);color:var(--muted)}
+.sc-name{font-size:.7rem;color:var(--muted);flex:1;min-width:0;
+         overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.badge{font-size:.7rem;font-weight:600;padding:2px 9px;border-radius:99px}
+.bs{background:rgba(239,68,68,.15);color:#fca5a5;border:1px solid rgba(239,68,68,.2)}
+.bn{background:rgba(16,185,129,.12);color:#6ee7b7;border:1px solid rgba(16,185,129,.2)}
+.prob-row{font-size:.67rem;font-family:monospace;color:var(--muted)}
+
+/* ── XAI ── */
+.xai-panels{display:grid;grid-template-columns:1fr 1fr;gap:9px}
+.xai-pane{display:flex;flex-direction:column;gap:5px}
+.xai-wrap{position:relative}
+.ximg{width:100%;aspect-ratio:1;object-fit:cover;border-radius:8px;
+      border:1px solid var(--bdr);background:#000;display:block}
+.ximg-s{border-color:rgba(239,68,68,.35)!important}
+.roi-badge{position:absolute;bottom:5px;left:5px;display:flex;align-items:center;gap:4px;
+           background:rgba(0,0,0,.78);padding:2px 7px;border-radius:99px}
+.roi-dot{width:5px;height:5px;border-radius:50%;background:#ef4444;
+         animation:roiPulse 2s infinite}
+.roi-txt{font-size:.54rem;color:#fff;font-weight:600}
+.xai-cap-row{display:flex;align-items:center;justify-content:space-between}
+.xai-cap{font-size:.57rem;font-weight:700;text-transform:uppercase;
+         letter-spacing:.07em;color:var(--muted)}
+.xai-tog{font-size:.57rem;padding:2px 8px;border:1px solid var(--bdr2);
+         border-radius:99px;background:transparent;color:var(--muted);cursor:pointer}
+.xai-tog:hover{color:var(--txt)}
+.no-hm{aspect-ratio:1;border-radius:8px;border:1px dashed var(--bdr);
+       display:flex;flex-direction:column;align-items:center;justify-content:center;
+       gap:5px;color:var(--muted);font-size:.7rem;text-align:center;padding:10px}
+.legend-row{display:flex;align-items:center;gap:8px;grid-column:1/-1;margin-top:2px}
+.legend-bar{width:66px;height:5px;border-radius:99px;
+            background:linear-gradient(90deg,#0000ff,#00ff00,#ffff00,#ff0000);flex-shrink:0}
+.legend-items{display:flex;gap:9px}
+.legend-item{font-size:.57rem;font-weight:600;text-transform:uppercase;letter-spacing:.05em}
+
+/* ── Chart ── */
+.chart-card{background:var(--surf);border:1px solid var(--bdr);
+            border-radius:var(--r2);padding:17px 22px}
+#chart-bars{display:flex;align-items:flex-end;gap:8px;height:110px}
+#chart-lbls{display:flex;gap:8px;margin-top:5px}
+.chart-legend{display:flex;gap:14px;justify-content:center;margin-top:8px}
+.cl-item{display:flex;align-items:center;gap:4px;font-size:.6rem;color:var(--muted)}
+.cl-dot{width:8px;height:8px;border-radius:2px}
+
+/* ── How it works ── */
+.how-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:10px}
+.how-card{background:rgba(255,255,255,.02);border:1px solid var(--bdr);
+          border-radius:var(--r);padding:16px;display:flex;flex-direction:column;gap:7px}
+.how-icon{font-size:1.3rem}
+.how-title{font-size:.8rem;font-weight:600;color:#fff}
+.how-desc{font-size:.7rem;color:var(--muted);line-height:1.6}
+
+footer{text-align:center;padding:20px;border-top:1px solid var(--bdr);
+       font-size:.65rem;color:#1e293b;margin-top:8px}
+.hidden{display:none!important}
+</style>
+</head>
+<body>
+
+<!-- NAV -->
+<nav>
+  <div class="brand">
+    <div class="brand-icon">🧠</div>
+    <span class="brand-name">StrokeAI</span>
+    <span class="brand-tag">v4 · VinceNet</span>
+  </div>
+  <div class="nav-pills">
+    <span class="pill p-info" id="model-pill">Loading…</span>
+    <span class="pill p-warn" id="status-pill">Connecting…</span>
+  </div>
+</nav>
+
+<!-- MAIN -->
+<main>
+
+  <!-- Hero -->
+  <div class="hero" id="hero">
+    <h1>VinceNet Stroke Detection</h1>
+    <p>Your custom-trained model analyses brain CT / MRI scans and returns
+       real predictions with <b style="color:var(--acc)">XAI heatmaps</b> and
+       an AI clinical explanation.</p>
+    <div class="hero-badges">
+      <span class="hbadge good">ROC-AUC 0.99999</span>
+      <span class="hbadge good">PR-AUC 0.999985</span>
+      <span class="hbadge">Threshold 0.987</span>
+      <span class="hbadge">128 × 128 input</span>
+      <span class="hbadge">Binary sigmoid</span>
+    </div>
+  </div>
+
+  <!-- Upload card -->
+  <div class="card">
+    <div id="dz"
+      ondragover="ev.preventDefault();this.classList.add('over')"
+      ondragleave="this.classList.remove('over')"
+      ondrop="onDrop(event)"
+      onclick="document.getElementById('fi').click()">
+      <input type="file" id="fi" multiple accept="image/*" style="display:none"
+             onchange="addFiles(this.files);this.value=''">
+      <div class="dz-icon">🧠</div>
+      <p class="dz-title">Drop brain scans here</p>
+      <p class="dz-sub">or <b>click to browse</b> · JPEG / PNG / WEBP · up to 10 scans</p>
+      <span id="cpill"></span>
+    </div>
+    <div id="thumbs"></div>
+    <div id="err-box"></div>
+    <div id="action-row">
+      <button class="btn-p" id="anlbtn" onclick="runAnalysis()">Analyse Scans</button>
+      <button class="btn-g" onclick="resetAll()">Clear all</button>
+    </div>
+    <div id="loading">
+      <div class="spinner"></div>
+      <div class="steps-list">
+        <div class="step" id="s1">Validating images (128×128, Xception preprocess)…</div>
+        <div class="step" id="s2">Running VinceNet TFLite inference…</div>
+        <div class="step" id="s3">Applying threshold 0.987…</div>
+        <div class="step" id="s4">Generating occlusion XAI heatmaps…</div>
+        <div class="step" id="s5">Calling Claude AI for explanation…</div>
+        <div class="step" id="s6">Aggregating multi-scan results…</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Results -->
+  <div id="results">
+    <div id="vbanner" class="verdict fade-up"></div>
+
+    <div class="chart-card fade-up hidden" id="chart-box">
+      <p class="sec-title">Per-Scan Confidence</p>
+      <div id="chart-bars"></div>
+      <div id="chart-lbls"></div>
+      <div class="chart-legend">
+        <div class="cl-item"><span class="cl-dot" style="background:#ef4444"></span>Stroke</div>
+        <div class="cl-item"><span class="cl-dot" style="background:#10b981"></span>Normal</div>
+      </div>
+    </div>
+
+    <div class="claude-box fade-up">
+      <div class="claude-hdr">
+        <div class="claude-icon">🤖</div>
+        <span class="claude-lbl">Claude AI — Clinical Explanation</span>
+      </div>
+      <div class="claude-txt" id="claude-txt"></div>
+    </div>
+
+    <div class="fade-up">
+      <p class="sec-title" id="cards-title"></p>
+      <div id="scan-grid"></div>
+    </div>
+
+    <button class="btn-g fade-up" onclick="resetAll()" style="margin-top:4px">
+      ↩ New Analysis
+    </button>
+  </div>
+
+  <!-- How it works -->
+  <div class="how-grid" id="how-grid">
+    <div class="how-card">
+      <div class="how-icon">📤</div>
+      <p class="how-title">Upload Scans</p>
+      <p class="how-desc">Drop 1–10 brain CT or MRI images. JPEG, PNG and WEBP all supported.</p>
+    </div>
+    <div class="how-card">
+      <div class="how-icon">🧠</div>
+      <p class="how-title">VinceNet AI</p>
+      <p class="how-desc">Your model (ROC-AUC 0.99999) classifies each scan using the trained threshold 0.987.</p>
+    </div>
+    <div class="how-card">
+      <div class="how-icon">🗺️</div>
+      <p class="how-title">XAI Heatmap</p>
+      <p class="how-desc">Occlusion sensitivity maps the stroke region of interest in red/orange JET colormap.</p>
+    </div>
+    <div class="how-card">
+      <div class="how-icon">📋</div>
+      <p class="how-title">PDF Report</p>
+      <p class="how-desc">Download a print-ready clinical report with all results and AI explanation.</p>
+    </div>
+  </div>
+
+</main>
+
+<footer>StrokeAI v4 · VinceNet · ROC-AUC 0.99999 · Research only · Not for clinical use · Port 9000</footer>
+
+<script>
+'use strict';
+
+// ── State ─────────────────────────────────────────────────────────────
+const API  = '';   // same-origin — served by FastAPI on port 9000
+let files = [], cache = new Map(), hmState = {};
+
+// ── Health check ──────────────────────────────────────────────────────
+async function checkHealth() {
+  try {
+    const d  = await fetch(`${API}/health`).then(r => r.json());
+    const sp = document.getElementById('status-pill');
+    const mp = document.getElementById('model-pill');
+    sp.textContent = '● Online';
+    sp.className   = 'pill p-ok';
+    if (d.model_loaded) {
+      mp.textContent = `VinceNet · AUC ${d.roc_auc}`;
+      mp.className   = 'pill p-ok';
+    } else {
+      mp.textContent = '⚠️ Demo Mode';
+      mp.className   = 'pill p-warn';
+    }
+  } catch {
+    document.getElementById('status-pill').textContent = '● Offline';
+    document.getElementById('status-pill').className   = 'pill p-err';
+    document.getElementById('model-pill').textContent  = '—';
+    document.getElementById('model-pill').className    = 'pill p-err';
+  }
+}
+checkHealth();
+setInterval(checkHealth, 8000);
+
+// ── File helpers ──────────────────────────────────────────────────────
+function onDrop(e) {
+  e.preventDefault();
+  e.currentTarget.classList.remove('over');
+  addFiles(e.dataTransfer.files);
+}
+function addFiles(fl) {
+  const ok = ['image/jpeg','image/png','image/webp','image/bmp','image/gif'];
+  for (const f of fl) {
+    if (!ok.includes(f.type)) { showErr(`"${f.name}" — unsupported format.`); return; }
+    if (f.size > 15*1024*1024){ showErr(`"${f.name}" — exceeds 15 MB.`);      return; }
+  }
+  const merged = [...files, ...Array.from(fl)]
+    .reduce((a,f) => a.find(x=>x.name===f.name) ? a : [...a,f], []);
+  if (merged.length > 10) { showErr('Maximum 10 images allowed.'); return; }
+  clearErr(); files = merged; renderThumbs();
+}
+function getUrl(f) {
+  if (!cache.has(f.name)) cache.set(f.name, URL.createObjectURL(f));
+  return cache.get(f.name);
+}
+function rmFile(name) {
+  const u = cache.get(name); if (u){ URL.revokeObjectURL(u); cache.delete(name); }
+  files = files.filter(f => f.name !== name); renderThumbs(); clearErr();
+}
+function renderThumbs() {
+  const t=document.getElementById('thumbs');
+  const p=document.getElementById('cpill');
+  const a=document.getElementById('action-row');
+  const btn=document.getElementById('anlbtn');
+  if (!files.length) {
+    t.innerHTML=''; t.style.display='none';
+    p.style.display='none'; a.style.display='none'; return;
+  }
+  p.textContent  = `${files.length} scan${files.length>1?'s':''} ready`;
+  p.style.display= 'inline';
+  btn.textContent= `Analyse ${files.length} Scan${files.length>1?'s':''}`;
+  a.style.display= 'flex'; t.style.display='flex';
+  t.innerHTML = files.map(f=>`
+    <div class="thumb">
+      <img src="${getUrl(f)}" loading="lazy">
+      <button class="tdel" onclick="rmFile('${f.name}')">✕</button>
+      <span class="tname">${f.name}</span>
+    </div>`).join('');
+}
+function showErr(m){ const e=document.getElementById('err-box'); e.textContent='⚠️ '+m; e.style.display='block'; }
+function clearErr() { const e=document.getElementById('err-box'); if(e) e.style.display='none'; }
+
+// ── Analysis ──────────────────────────────────────────────────────────
+async function runAnalysis() {
+  if (!files.length) return;
+  document.getElementById('action-row').style.display = 'none';
+  document.getElementById('loading').style.display    = 'flex';
+  document.getElementById('results').style.display    = 'none';
+  document.getElementById('how-grid').classList.add('hidden');
+  document.getElementById('hero').style.display       = 'none';
+  clearErr();
+
+  const STEPS  = ['s1','s2','s3','s4','s5','s6'];
+  let stepIdx  = 0;
+  const tick   = () => {
+    STEPS.forEach((id,j) => {
+      document.getElementById(id).className =
+        'step' + (j<stepIdx?' done': j===stepIdx?' active':'');
+    });
+  };
+  tick();
+  const timer = setInterval(() => {
+    if (stepIdx < STEPS.length-1){ stepIdx++; tick(); }
+  }, 900);
+
+  try {
+    const fd = new FormData();
+    files.forEach(f => fd.append('files', f));
+    const res = await fetch(`${API}/predict`, { method:'POST', body:fd });
+
+    clearInterval(timer);
+    stepIdx = STEPS.length-1; tick();
+    await new Promise(r=>setTimeout(r,300));
+
+    if (!res.ok) {
+      const err = await res.json().catch(()=>({detail:`Server error ${res.status}`}));
+      throw new Error(err.detail || `HTTP ${res.status}`);
+    }
+
+    const data = await res.json();
+    document.getElementById('loading').style.display    = 'none';
+    document.getElementById('action-row').style.display = 'flex';
+    renderResults(data);
+
+  } catch(err) {
+    clearInterval(timer);
+    document.getElementById('loading').style.display    = 'none';
+    document.getElementById('action-row').style.display = 'flex';
+    document.getElementById('hero').style.display       = 'block';
+    document.getElementById('how-grid').classList.remove('hidden');
+    showErr(`${err.message}. Is the backend running? Open http://localhost:9000/health`);
+  }
+}
+
+// ── Render results ────────────────────────────────────────────────────
+function renderResults(data) {
+  const { prediction, confidence, individual_results, explanation, model_info } = data;
+  const isS  = prediction === 'Stroke';
+  const pct  = Math.round(confidence * 100);
+  const n    = individual_results.length;
+  const sc   = individual_results.filter(r => r.prediction==='Stroke').length;
+
+  // Verdict
+  const vb = document.getElementById('vbanner');
+  vb.className = `verdict fade-up ${isS?'vs':'vn'}`;
+  vb.innerHTML = `
+    <div class="v-lbl">${n>1 ? `Aggregated · ${n} scans · majority vote` : 'VinceNet Analysis'}</div>
+    <div class="v-title" style="color:${isS?'#fca5a5':'#6ee7b7'}">
+      ${isS ? '⚠️ Stroke Detected' : '✅ Normal'}
+    </div>
+    ${n>1 ? `<p class="v-sub">${sc}/${n} scans flagged Stroke · ${n-sc} Normal</p>` : ''}
+    <div class="cbar-wrap">
+      <div class="cbar-hdr">
+        <span class="cbar-lbl">Confidence</span>
+        <span class="cbar-val" style="color:${isS?'#fca5a5':'#6ee7b7'}">${pct}%</span>
+      </div>
+      <div class="cbar-track">
+        <div class="cbar-fill ${isS?'fs':'fn'}" id="agg-bar"></div>
+      </div>
+    </div>
+    <div class="v-stats">
+      <div class="vstat"><span class="val">${model_info?.roc_auc ?? 0.99999}</span><span class="lbl">ROC-AUC</span></div>
+      <div class="vstat"><span class="val">${Number(model_info?.threshold ?? 0.987).toFixed(3)}</span><span class="lbl">Threshold</span></div>
+      <div class="vstat"><span class="val">${n}</span><span class="lbl">Scan${n>1?'s':''}</span></div>
+      <div class="vstat"><span class="val">VinceNet</span><span class="lbl">Model</span></div>
+    </div>
+    <div style="display:flex;gap:8px;margin-top:14px;flex-wrap:wrap">
+      <button class="btn-g" onclick="downloadPDF()" style="font-size:.78rem">⬇ PDF Report</button>
+      <button class="btn-g" onclick="resetAll()" style="font-size:.78rem">↩ New Analysis</button>
+    </div>`;
+  setTimeout(() => { const b=document.getElementById('agg-bar'); if(b) b.style.width=pct+'%'; }, 120);
+
+  // Chart
+  const cb = document.getElementById('chart-box');
+  if (n > 1) { cb.classList.remove('hidden'); renderChart(individual_results); }
+  else cb.classList.add('hidden');
+
+  // Claude
+  document.getElementById('claude-txt').textContent = explanation;
+
+  // Cards
+  document.getElementById('cards-title').textContent =
+    n > 1 ? `Individual Results (${n})` : 'Scan Analysis';
+  hmState = {};
+  const grid = document.getElementById('scan-grid');
+  grid.innerHTML = '';
+
+  individual_results.forEach((r, i) => {
+    const isRS   = r.prediction === 'Stroke';
+    const cpct   = Math.round(r.confidence * 100);
+    const hmUrl  = r.heatmap ? `data:image/png;base64,${r.heatmap}` : '';
+    const origUrl= files[i] ? getUrl(files[i]) : '';
+    hmState[i]   = true;
+
+    const card = document.createElement('div');
+    card.className = `scan-card ${isRS ? 'sc-s' : 'sc-n'}`;
+    card.innerHTML = `
+      <div class="sc-hdr">
+        <span class="sc-num">#${i+1}</span>
+        <span class="sc-name">${r.filename}</span>
+        <span class="badge ${isRS?'bs':'bn'}">${isRS?'⚠️ Stroke':'✅ Normal'}</span>
+      </div>
+      ${r.raw_prob !== undefined ? `
+      <div class="prob-row">
+        Raw prob: <b>${r.raw_prob}</b> &nbsp;·&nbsp;
+        Threshold: 0.987 &nbsp;·&nbsp;
+        <span style="color:${r.raw_prob>=0.987?'#fca5a5':'#6ee7b7'}">
+          ${r.raw_prob>=0.987 ? '🔴 Above' : '🟢 Below'} threshold
+        </span>
+      </div>` : ''}
+      <div class="xai-panels">
+        <div class="xai-pane">
+          <div class="xai-wrap">
+            ${origUrl
+              ? `<img class="ximg" src="${origUrl}" loading="lazy">`
+              : '<div class="no-hm">No preview</div>'}
+          </div>
+          <div class="xai-cap-row"><span class="xai-cap">Original</span></div>
+        </div>
+        <div class="xai-pane">
+          ${isRS && hmUrl ? `
+          <div class="xai-wrap">
+            <img class="ximg ximg-s" id="hm-${i}" src="${hmUrl}" loading="lazy">
+            <div class="roi-badge" id="roi-${i}">
+              <span class="roi-dot"></span><span class="roi-txt">ROI</span>
+            </div>
+          </div>
+          <div class="xai-cap-row">
+            <span class="xai-cap">Occlusion XAI</span>
+            <button class="xai-tog" id="tog-${i}"
+              onclick="toggleHM(${i},'${origUrl}','${hmUrl}')">Hide</button>
+          </div>` : `
+          <div class="no-hm">
+            <span style="font-size:1.3rem">${isRS?'⏳':'✅'}</span>
+            <p>${isRS?'No heatmap':'Normal — no XAI'}</p>
+          </div>
+          <div class="xai-cap-row"><span class="xai-cap">${isRS?'Heatmap':'No XAI'}</span></div>`}
+        </div>
+        ${isRS && hmUrl ? `
+        <div class="legend-row">
+          <div class="legend-bar"></div>
+          <div class="legend-items">
+            <span class="legend-item" style="color:#6699ff">Low</span>
+            <span class="legend-item" style="color:#00cc66">Med</span>
+            <span class="legend-item" style="color:#ff4400">High (ROI)</span>
+          </div>
+        </div>` : ''}
+      </div>
+      <div class="cbar-wrap" style="margin-top:0">
+        <div class="cbar-hdr">
+          <span class="cbar-lbl">Confidence</span>
+          <span class="cbar-val" style="color:${isRS?'#fca5a5':'#6ee7b7'}">${cpct}%</span>
+        </div>
+        <div class="cbar-track">
+          <div class="cbar-fill ${isRS?'fs':'fn'}" id="bar-${i}" style="width:0"></div>
+        </div>
+      </div>`;
+    grid.appendChild(card);
+  });
+
+  document.getElementById('results').style.cssText = 'display:flex;flex-direction:column;gap:20px';
+
+  requestAnimationFrame(() => {
+    individual_results.forEach((_, i) => {
+      setTimeout(() => {
+        const b = document.getElementById(`bar-${i}`);
+        if (b) b.style.width = Math.round(individual_results[i].confidence * 100) + '%';
+      }, 150 + i * 75);
+    });
+    document.getElementById('results').scrollIntoView({ behavior:'smooth', block:'start' });
+  });
+}
+
+function toggleHM(idx, origUrl, hmUrl) {
+  hmState[idx] = !hmState[idx];
+  const show = hmState[idx];
+  const img  = document.getElementById(`hm-${idx}`);
+  const tog  = document.getElementById(`tog-${idx}`);
+  const roi  = document.getElementById(`roi-${idx}`);
+  if (img) img.src            = show ? hmUrl    : origUrl;
+  if (tog) tog.textContent    = show ? 'Hide'   : 'Show';
+  if (roi) roi.style.display  = show ? 'flex'   : 'none';
+}
+
+// ── Chart ─────────────────────────────────────────────────────────────
+function renderChart(results) {
+  const area = document.getElementById('chart-bars');
+  const lbls = document.getElementById('chart-lbls');
+  area.innerHTML = ''; lbls.innerHTML = '';
+  results.forEach((r, i) => {
+    const pct  = Math.round(r.confidence * 100);
+    const isS  = r.prediction === 'Stroke';
+    const col  = document.createElement('div');
+    col.style.cssText = 'flex:1;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;gap:3px;height:100%';
+    col.innerHTML = `
+      <span style="font-size:.58rem;font-family:monospace;color:${isS?'#fca5a5':'#6ee7b7'};font-weight:600">${pct}%</span>
+      <div style="width:100%;border-radius:4px 4px 0 0;
+           background:${isS?'rgba(239,68,68,.75)':'rgba(16,185,129,.75)'};
+           height:0;transition:height .9s cubic-bezier(.4,0,.2,1)"
+           data-h="${(pct/100)*95}px"></div>`;
+    area.appendChild(col);
+    const lbl = document.createElement('div');
+    lbl.style.cssText = 'flex:1;text-align:center;font-size:.58rem;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap';
+    lbl.textContent   = (files[i]?.name.length > 12) ? `Scan ${i+1}` : (files[i]?.name || `Scan ${i+1}`);
+    lbls.appendChild(lbl);
+  });
+  setTimeout(() =>
+    area.querySelectorAll('[data-h]').forEach(b => b.style.height = b.dataset.h),
+  160);
+}
+
+// ── PDF ───────────────────────────────────────────────────────────────
+function downloadPDF() {
+  const vt   = document.querySelector('#vbanner .v-title')?.textContent?.trim() || '';
+  const isS  = vt.includes('Stroke');
+  const expl = document.getElementById('claude-txt')?.textContent || '';
+  const date = new Date().toLocaleString();
+  const cards= [...document.querySelectorAll('#scan-grid .scan-card')];
+
+  const rows = files.map((f, i) => {
+    const bar  = document.getElementById(`bar-${i}`);
+    const conf = bar ? parseFloat(bar.style.width || '75') : 75;
+    const isRS = cards[i]?.classList.contains('sc-s');
+    return `<tr>
+      <td>${i+1}</td><td>${f.name}</td>
+      <td style="color:${isRS?'#dc2626':'#059669'};font-weight:600">
+        ${isRS?'Stroke':'Normal'}</td>
+      <td>${Math.round(conf)}%</td></tr>`;
+  }).join('');
+
+  const html = `<!DOCTYPE html><html><head><meta charset="utf-8">
+  <title>StrokeAI VinceNet Report — ${date}</title>
+  <style>
+    body{font-family:'Segoe UI',Arial,sans-serif;color:#111;padding:40px;max-width:720px;margin:0 auto}
+    h1{font-size:22px;color:#0e7490;margin-bottom:4px}
+    .sub{font-size:11px;color:#888;margin-bottom:20px}
+    .verdict{font-size:20px;font-weight:700;color:${isS?'#dc2626':'#059669'};margin:14px 0 6px}
+    .stats{display:flex;gap:16px;flex-wrap:wrap;margin:10px 0 18px}
+    .stat{background:#f8fafc;border:1px solid #e2e8f0;padding:8px 14px;border-radius:8px;font-size:11px}
+    .stat b{font-size:16px;font-weight:700;color:#0e7490;display:block}
+    h2{font-size:10px;text-transform:uppercase;letter-spacing:.08em;color:#0e7490;
+       margin:20px 0 9px;border-top:1px solid #e5e7eb;padding-top:13px}
+    table{width:100%;border-collapse:collapse;font-size:12px}
+    th,td{text-align:left;padding:8px 12px;border-bottom:1px solid #e5e7eb}
+    th{background:#f8fafc;font-weight:600}
+    .expl{font-size:12px;line-height:1.8;white-space:pre-line;background:#f8fafc;
+          border:1px solid #e2e8f0;border-radius:8px;padding:14px}
+    .foot{margin-top:28px;font-size:10px;color:#aaa;
+          border-top:1px solid #e5e7eb;padding-top:12px}
+  </style></head><body>
+  <h1>🧠 StrokeAI v4 — VinceNet Report</h1>
+  <p class="sub">Generated: ${date}</p>
+  <div class="verdict">${isS?'⚠️ Stroke Detected':'✅ Normal'}</div>
+  <div class="stats">
+    <div class="stat"><b>0.99999</b>ROC-AUC</div>
+    <div class="stat"><b>0.999985</b>PR-AUC</div>
+    <div class="stat"><b>0.987</b>Threshold</div>
+    <div class="stat"><b>${files.length}</b>Scans</div>
+    <div class="stat"><b>128×128</b>Input</div>
+  </div>
+  <h2>Individual Scan Results</h2>
+  <table><thead><tr><th>#</th><th>Filename</th><th>Prediction</th><th>Confidence</th></tr></thead>
+  <tbody>${rows}</tbody></table>
+  <h2>AI Clinical Explanation</h2>
+  <div class="expl">${expl}</div>
+  <div class="foot">
+    StrokeAI v4 · VinceNet (vincenet_stroke_f32.tflite) ·
+    For research and educational purposes only ·
+    Not a substitute for professional medical diagnosis
+  </div>
+  </body></html>`;
+
+  const w = window.open('', '_blank');
+  if (!w) { alert('Allow pop-ups to download the PDF.'); return; }
+  w.document.write(html);
+  w.document.close();
+  w.onload = () => { w.focus(); w.print(); };
+}
+
+// ── Reset ─────────────────────────────────────────────────────────────
+function resetAll() {
+  cache.forEach(u => URL.revokeObjectURL(u)); cache.clear();
+  files = []; hmState = {};
+  ['thumbs','scan-grid'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) { el.innerHTML=''; el.style.display='none'; }
+  });
+  document.getElementById('action-row').style.display = 'none';
+  document.getElementById('cpill').style.display      = 'none';
+  document.getElementById('loading').style.display    = 'none';
+  document.getElementById('results').style.display    = 'none';
+  document.getElementById('how-grid').classList.remove('hidden');
+  document.getElementById('hero').style.display       = 'block';
+  document.getElementById('chart-box').classList.add('hidden');
+  clearErr();
+}
+</script>
+</body>
+</html>

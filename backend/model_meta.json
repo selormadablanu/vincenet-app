@@ -1,0 +1,9 @@
+{
+  "best_threshold": 0.987239420413971,
+  "img_size": 128,
+  "classes": ["Normal", "Stroke"],
+  "tflite_f32": "vincenet_stroke_f32.tflite",
+  "tflite_quantised": "vincenet_stroke_int8.tflite",
+  "roc_auc": 0.99999,
+  "pr_auc": 0.999985
+}

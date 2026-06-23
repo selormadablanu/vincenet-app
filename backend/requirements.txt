@@ -1,0 +1,10 @@
+setuptools==69.5.1
+wheel==0.43.0
+fastapi==0.111.0
+uvicorn[standard]==0.30.1
+python-multipart==0.0.9
+Pillow==10.2.0
+numpy==1.26.4
+tensorflow==2.16.1
+anthropic==0.28.0
+python-dotenv==1.0.1
